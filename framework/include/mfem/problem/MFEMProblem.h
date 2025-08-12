@@ -14,11 +14,18 @@
 #include "MFEMProblemData.h"
 #include "MFEMMesh.h"
 #include "MFEMExecutioner.h"
+#include "mfem.hpp" 
+
+namespace mfem {
+  class Coefficient;
+}
 
 class MFEMProblem : public ExternalProblem
 {
 public:
   static InputParameters validParams();
+  //expose read-only access to "r" and "inv_r"
+  const mfem::Coefficient * getBuiltinCoefficient(const std::string & name) const;
 
   MFEMProblem(const InputParameters & params);
   virtual ~MFEMProblem() {}
@@ -211,6 +218,13 @@ public:
 
 protected:
   MFEMProblemData _problem_data;
+
+  enum class RadialSystem {None, Cylindrical, Spherical};
+  RadialSystem _radial_system = RadialSystem::None;
+  Real _inv_r_eps = 1e-12; //Floor for 1/r to avoid dividing by zero
+
+  std::unordered_map<std::string, std::unique_ptr<mfem::Coefficient>> _builtin_coeffs; // store tge builtin coefficients (r, inv_r)
+  void _maybeAddRadialCoefficients();
 };
 
 #endif

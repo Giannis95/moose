@@ -15,11 +15,33 @@
 #include "MFEMSubMesh.h"
 #include "MFEMFunctorMaterial.h"
 #include "libmesh/string_to_enum.h"
+#include "MFEMProblem.h"
+#include "mfem.hpp"
 
 #include <vector>
 #include <algorithm>
 
 registerMooseObject("MooseApp", MFEMProblem);
+
+namespace { //Anonymous helper to ensure 1/r avoids div-by-zero
+class SafeInvRCoefficient : public mfem::Coefficient
+{
+public:
+  SafeInvRCoefficient(mfem::Coefficient &r, double eps)
+    : _r(r), _eps(eps) {}
+
+  double Eval(mfem::ElementTransformation &T,
+              const mfem::IntegrationPoint & ip) override
+{
+  const double val = _r.Eval(T,ip);
+  const double denom = (val > _eps) ? val : _eps;
+  return 1.0 / denom;
+}
+private:
+  mfem::Coefficient & _r; //reference to r coefficient
+  const double _eps; //floor for 1/r
+};
+} //namespace close 
 
 InputParameters
 MFEMProblem::validParams()
@@ -27,6 +49,20 @@ MFEMProblem::validParams()
   InputParameters params = ExternalProblem::validParams();
   params.addClassDescription("Problem type for building and solving finite element problem using"
                              " the MFEM finite element library.");
+  params.addParam<MooseEnum>(
+    "radial_system",
+    MooseEnum("none=0 cylyndrical spherical"), //enum values
+    "Coordinate system for built in radial coefficients."
+    "'cylindrical' exposes r = sqrt(x^2+y^2).;"
+    "'spherical' exposes r = sqrt(x^2 + y^2 + z^2)."
+    "When NOT 'none', two coefficients named 'r' and 'inv_r' are registered");
+
+  params.addParam<Real>(
+    "inv_r_eps",
+    1e-12,
+    "Small floor to avoid division by zero for the inverse radial coefficient"
+  );
+
   return params;
 }
 
@@ -34,6 +70,18 @@ MFEMProblem::MFEMProblem(const InputParameters & params) : ExternalProblem(param
 {
   // Initialise Hypre for all MFEM problems.
   mfem::Hypre::Init();
+
+  const MooseEnum rs = getParam<MooseEnum>("radial_system");
+  if (rs == "cylindrical")
+    _radial_system = RadialSystem::Cylindrical;
+  else if (rs == "spherical")
+    _radial_system = RadialSystem::Spherical;
+  else
+    _radial_system = RadialSystem::None;
+
+  _inv_r_eps = getParam<Real>("inv_r_eps");
+
+  _maybeAddRadialCoefficients();
 }
 
 void
@@ -535,4 +583,40 @@ MFEMProblem::solverTypeString(const unsigned int libmesh_dbg_var(solver_sys_num)
   return MooseUtils::prettyCppType(getProblemData().jacobian_solver.get());
 }
 
+void
+MFEMProblem::_maybeAddRadialCoefficients()
+{
+  if (_radial_system == RadialSystem::None)
+    return;
+
+  std::unique_ptr<mfem::Coefficient> r;
+
+  if (_radial_system == RadialSystem::Cylindrical)
+  {
+    r = std::unique_ptr<mfem::Coefficient>(
+          new mfem::CylindricalRadialCoefficient());
+    
+  }
+  else //spherical 
+  {
+    r = std::unique_ptr<mfem::Coefficient>(
+          new mfem::SphericalRadialCoefficient());
+  }
+
+  mfem::Coefficient & r_ref = *r;
+
+  _builtin_coeffs.emplace("r", std::move(r)); //expose as "r"
+
+  _builtin_coeffs.emplace( //expose as "inv_r"
+    "inv_r",
+    std::unique_ptr<mfem::Coefficient>(
+        new SafeInvRCoefficient(r_ref, _inv_r_eps))); // 1/max(r,eps)
+}
+
+// //accessor to fetch by name elsewhere 
+// const mfem::Coefficient *
+// {
+//   auto it = _builtin_coeffs.find(name);
+//   return it == _builtin_coeffs.end() ? nullptr : it->second.get();
+// }
 #endif
