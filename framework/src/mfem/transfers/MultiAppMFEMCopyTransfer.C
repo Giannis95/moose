@@ -66,21 +66,58 @@ MultiAppMFEMCopyTransfer::MultiAppMFEMCopyTransfer(InputParameters const & param
 void
 MultiAppMFEMCopyTransfer::transfer(MFEMProblem & to_problem, MFEMProblem & from_problem)
 {
-  // Redundant as source name is required?
   if (!numToVar())
-    mooseError("No transferred variables were specified, neither programmatically or through the "
-               "'source_variable' parameter");
+    mooseError("No transferred variables were specified, "
+               "neither programmatically or through the 'source_variable' parameter");
   if (numToVar() != numFromVar())
     mooseError("Number of variables transferred must be same in both systems.");
+
   for (unsigned v = 0; v < numToVar(); ++v)
   {
-    auto & to_var = to_problem.getProblemData().gridfunctions.GetRef(getToVarName(v));
-    auto & from_var = from_problem.getProblemData().gridfunctions.GetRef(getFromVarName(v));
-    // TODO: Probably need more checking here to make sure the variables are
-    // copyable - as per the MultiAppDofCopyTransfer
-    to_var = from_var;
+    const auto & name_from = getFromVarName(v);
+    const auto & name_to   = getToVarName(v);
+
+    auto & from_data = from_problem.getProblemData();
+    auto & to_data   = to_problem.getProblemData();
+
+    // ===== REAL → REAL ==================================================
+    if (from_data.gridfunctions.Has(name_from))
+    {
+      if (!to_data.gridfunctions.Has(name_to))
+        mooseError("MultiAppMFEMCopyTransfer: trying to copy real field '",
+                   name_from, "' into non-real target field '", name_to, "'");
+
+      auto & from_var = from_data.gridfunctions.GetRef(name_from);
+      auto & to_var   = to_data.gridfunctions.GetRef(name_to);
+
+      to_var = from_var;
+      continue;
+    }
+
+    // ===== COMPLEX → COMPLEX =============================================
+    if (from_data.cmplx_gridfunctions.Has(name_from))
+    {
+      if (!to_data.cmplx_gridfunctions.Has(name_to))
+        mooseError("MultiAppMFEMCopyTransfer: trying to copy complex field '",
+                   name_from, "' into non-complex target field '", name_to, "'");
+
+      auto & from_c = from_data.cmplx_gridfunctions.GetRef(name_from);
+      auto & to_c   = to_data.cmplx_gridfunctions.GetRef(name_to);
+
+      // Copy real part
+      to_c.real() = from_c.real();
+      // Copy imaginary part
+      to_c.imag() = from_c.imag();
+
+      continue;
+    }
+
+    // ===== ERROR: NOT FOUND ==============================================
+    mooseError("MultiAppMFEMCopyTransfer: field '", name_from,
+               "' not found as real or complex in source problem.");
   }
 }
+
 
 void
 MultiAppMFEMCopyTransfer::execute()
