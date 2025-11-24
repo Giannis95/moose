@@ -54,16 +54,18 @@ MFEMComplexAuxKernel::complexScale(mfem::ParComplexGridFunction & a,
 {
   // a *= scale
 
-  mfem::ParComplexGridFunction buf_var(a.ParFESpace());
-  buf_var.real() = 0.0;
-  buf_var.imag() = 0.0;
+  mfem::ParComplexGridFunction * buf_var = new mfem::ParComplexGridFunction(a.ParFESpace());
+  buf_var->real() = 0.0;
+  buf_var->imag() = 0.0;
 
-  buf_var.real().Add(scale.real(), a.real());
-  buf_var.real().Add(-scale.imag(), a.imag());
-  buf_var.imag().Add(scale.imag(), a.real());
-  buf_var.imag().Add(scale.real(), a.imag());
+  buf_var->real().Add(scale.real(), a.real());
+  buf_var->real().Add(-scale.imag(), a.imag());
+  buf_var->imag().Add(scale.imag(), a.real());
+  buf_var->imag().Add(scale.real(), a.imag());
 
-  a = buf_var;
+  a.NewDataAndSize(buf_var->GetData(), buf_var->Size());
+  delete buf_var;
+  
 }
 
 #endif
