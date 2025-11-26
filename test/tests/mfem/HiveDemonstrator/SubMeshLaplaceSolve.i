@@ -70,7 +70,7 @@ sigma_coil = 5.8e6 # S/m
     type = MFEMComplexGradAux
     variable = coil_a_field
     source = electric_potential
-    scale_factor = '${fparse 1.0/angfreq}'
+    scale_factor_real = '${fparse 1.0/angfreq}'
     execute_on = TIMESTEP_END
   []
 []
@@ -131,11 +131,10 @@ sigma_coil = 5.8e6 # S/m
   []  
 []
 
-
 [Outputs]
   [ParaViewDataCollection]
     type = MFEMParaViewDataCollection
-    file_base = HIVE/Submesh_Laplace_frequency_domain
+    file_base = HIVE/submesh_laplace_frequency_domain
     vtk_format = ASCII
   []
 []

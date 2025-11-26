@@ -40,6 +40,12 @@ nu0 = '${fparse (1.0e7)/(4*pi)}'
       fec_type = ND
       fec_order = FIRST
   []
+  [SubmeshL2FESpace]
+    type = MFEMVectorFESpace
+    fec_type = L2
+    fec_order = CONSTANT
+    submesh = coil_complement
+  []
   [SubmeshHCurlFESpace]
       type = MFEMVectorFESpace
       fec_type = ND
@@ -63,6 +69,10 @@ nu0 = '${fparse (1.0e7)/(4*pi)}'
     [coil_complement_source_a_field] #e field defined on submesh representing domain excluding coil volume but including coil surface
         type = MFEMComplexVariable
         fespace = SubmeshHCurlFESpace
+    []
+    [joule_heating]
+       type = MFEMComplexVariable
+        fespace = SubmeshL2FESpace
     []
 []
 
@@ -119,9 +129,21 @@ nu0 = '${fparse (1.0e7)/(4*pi)}'
     []
     [target]
         type = MFEMGenericFunctorMaterial
-        prop_names = 'massCoef lossCoef sigma nu'
-        prop_values = 'mass_coef loss_coef_target ${sigma_target} ${nu0}'
+        prop_names = 'massCoef lossCoef sigma nu '
+        prop_values = 'mass_coef loss_coef_target ${sigma_target} ${nu0} '
         block = 'target'
+    []
+[]
+
+[AuxKernels]
+ [compute_joule_heating]
+        type = MFEMComplexDotProductAux
+        variable = joule_heating
+        first_source_vec = a_field
+        second_source_vec = a_field
+        scale_factor_real = ${sigma_target}
+        scale_factor_imag = 0.0
+        execute_on = TIMESTEP_END
     []
 []
 
@@ -191,7 +213,7 @@ nu0 = '${fparse (1.0e7)/(4*pi)}'
 [Outputs]
   [ParaViewDataCollection]
     type = MFEMParaViewDataCollection
-    file_base = HIVE/Submesh_Aform_frequency_domain
+    file_base = HIVE/submesh_Aform_frequency_domain
     vtk_format = ASCII
     submesh = coil_complement
   []
