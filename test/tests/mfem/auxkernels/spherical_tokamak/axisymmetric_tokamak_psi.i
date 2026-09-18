@@ -148,26 +148,18 @@
   []
 []
 
-[BCs]
-  [essential]
-    type = MFEMScalarDirichletBC
-    variable = psi
-    boundary = 12
-    coefficient = zero
-  []
-
-[]
-
 [Solvers]
-  [boomeramg]
-    type = MFEMHypreBoomerAMG
-  []
-  [PCG]
-    type = MFEMHyprePCG
-    preconditioner = boomeramg
-    l_tol = 1e-8
+[cg]
+    type = MFEMCGSolver
+    l_tol = 1e-10
+    l_max_its = 1000
+    print_level = 1
   []
 
+  [ortho]
+    type = MFEMOrthoSolver
+    solver = cg
+  []
 []
 
 [Executioner]
@@ -220,8 +212,9 @@
   [ParaViewDataCollection]
     type = MFEMParaViewDataCollection
     file_base = OutputData/AxisymmetricTokamakPsi
-    scalar_coefficients =
-      'cylindrical_r cylindrical_inv_r cylindrical_p cylindrical_z'
+    scalar_coefficients = 'cylindrical_r cylindrical_inv_r cylindrical_p cylindrical_z'
     vtk_format = ASCII
+
+    additional_execute_on = FINAL
   []
 []

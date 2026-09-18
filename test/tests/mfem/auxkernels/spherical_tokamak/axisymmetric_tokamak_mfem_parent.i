@@ -123,15 +123,15 @@
   []
 []
 
-# [BCs]
-#   # Vacuum is a volume block, not a boundary condition.
-#   [essential]
-#     type = MFEMScalarDirichletBC
-#     variable = Atheta
-#     boundary = 12
-#     coefficient = zero
-#   []
-# []
+[BCs]
+  # Vacuum is a volume block, not a boundary condition.
+  [essential]
+    type = MFEMScalarDirichletBC
+    variable = Atheta
+    boundary = 12
+    coefficient = zero
+  []
+[]
 
 
 [Solvers]
